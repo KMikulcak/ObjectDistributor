@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using ObjectDistributor.Core;
 using ObjectDistributor.Test.Infrastructure.Consumer;
+using ObjectDistributor.Test.Infrastructure.Helper;
 using ObjectDistributor.Test.Infrastructure.Model;
 using ObjectDistributor.Test.Infrastructure.Worker;
 using Xunit;
@@ -17,46 +18,50 @@ namespace ObjectDistributor.Test
 
         private readonly ITestOutputHelper _output;
 
-        private IList<TestModel> _results;
-        private bool _done;
-        private int _counter;
         private const int Amount = 2;
 
-        private void SetResult(IList<TestModel> resultList)
+        private void PrintTestResults(IEnumerable<TestModel> results)
         {
-            foreach (var testModel in resultList) _results.Add(testModel);
-            _counter++;
-            if (_counter == 3) _done = true;
-        }
-
-        private List<string> PrepareTest()
-        {
-            _done = false;
-            _results = new List<TestModel>();
-
-            var strings = new List<string>();
-            for (var i = 0; i < Amount; i++) strings.Add($"{i}.NameS{i}");
-
-            return strings;
-        }
-
-        private void AwaitTest()
-        {
-            while (!_done)
-            {
-            }
-        }
-
-        private void PrintTestResults()
-        {
-            foreach (var testModel in _results)
+            foreach (var testModel in results)
                 _output.WriteLine($"ResultOutput: Model Id[{testModel.Id}] Name[{testModel.Name}]");
         }
 
         [Fact]
-        public void BaseTest()
+        public void WorkId1And2Test()
         {
-            var strings = PrepareTest();
+            var helper = new UnitTestHelper(Amount, 2, 3);
+            var valuesS = helper.PrepareData<string>();
+            var valuesI = helper.PrepareData<int>();
+
+            var distributor = new Distributor();
+            distributor.AddWorkerCell(new IntToEntityWorker());
+            distributor.AddWorkerCell(new StringToEntityWorker());
+            distributor.AddWorkerCell(new EntityToEntityWorker());
+            distributor.AddWorkerCell(new EntityToModelWorker());
+
+            distributor.Start();
+
+            distributor.AddData(valuesS, new ModelConsumer(helper.SetResult), 1);
+            distributor.AddData(valuesS, new ModelConsumer(helper.SetResult), 1);
+            distributor.AddData(valuesS, new ModelConsumer(helper.SetResult), 1);
+
+            distributor.AddData(valuesI, new ModelConsumer(helper.SetResult), 2);
+            distributor.AddData(valuesI, new ModelConsumer(helper.SetResult), 2);
+            distributor.AddData(valuesI, new ModelConsumer(helper.SetResult), 2);
+
+            helper.AwaitTest();
+            distributor.Stop();
+
+            PrintTestResults(helper.Results);
+
+            Assert.Equal(helper.ResultAmount(), helper.Results.Count);
+        }
+
+        [Fact]
+        public void WorkId1BaseTest()
+        {
+            var helper = new UnitTestHelper(Amount, 1, 3);
+            var values = helper.PrepareData<string>();
 
             var distributor = new Distributor();
             distributor.AddWorkerCell(new StringToEntityWorker());
@@ -65,16 +70,42 @@ namespace ObjectDistributor.Test
 
             distributor.Start();
 
-            distributor.AddData(strings, new ModelConsumer(SetResult), 1);
-            distributor.AddData(strings, new ModelConsumer(SetResult), 1);
-            distributor.AddData(strings, new ModelConsumer(SetResult), 1);
+            distributor.AddData(values, new ModelConsumer(helper.SetResult), 1);
+            distributor.AddData(values, new ModelConsumer(helper.SetResult), 1);
+            distributor.AddData(values, new ModelConsumer(helper.SetResult), 1);
 
-            AwaitTest();
+            helper.AwaitTest();
             distributor.Stop();
 
-            PrintTestResults();
+            PrintTestResults(helper.Results);
 
-            Assert.Equal(Amount * _counter, _results.Count);
+            Assert.Equal(helper.ResultAmount(), helper.Results.Count);
+        }
+
+        [Fact]
+        public void WorkId2BaseTest()
+        {
+            var helper = new UnitTestHelper(Amount, 1, 3);
+            var values = helper.PrepareData<int>();
+
+            var distributor = new Distributor();
+            distributor.AddWorkerCell(new IntToEntityWorker());
+            distributor.AddWorkerCell(new StringToEntityWorker());
+            distributor.AddWorkerCell(new EntityToEntityWorker());
+            distributor.AddWorkerCell(new EntityToModelWorker());
+
+            distributor.Start();
+
+            distributor.AddData(values, new ModelConsumer(helper.SetResult), 2);
+            distributor.AddData(values, new ModelConsumer(helper.SetResult), 2);
+            distributor.AddData(values, new ModelConsumer(helper.SetResult), 2);
+
+            helper.AwaitTest();
+            distributor.Stop();
+
+            PrintTestResults(helper.Results);
+
+            Assert.Equal(helper.ResultAmount(), helper.Results.Count);
         }
     }
 }

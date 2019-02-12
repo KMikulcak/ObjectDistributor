@@ -18,5 +18,15 @@ namespace ObjectDistributor.Test.Infrastructure.Consumer
         {
             _finished(result);
         }
+
+        public void Error(Exception ex)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void WasNull(Type wasNullType)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

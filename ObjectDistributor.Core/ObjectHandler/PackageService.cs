@@ -20,23 +20,30 @@ namespace ObjectDistributor.Core.ObjectHandler
         {
             return () =>
             {
-                var workers = _workerService.GetWorkerById(package.WorkId);
-
-                while (package.Status != Status.Resolved)
+                try
                 {
-                    var w = GetNextWorkerCell(workers, package);
-                    if (w != null)
+                    var workers = _workerService.GetWorkerById(package.WorkId);
+
+                    while (!package.IsResolved)
                     {
-                        workers.Remove(w);
-                        var results = w.Process(package.GetValueObjects<object>());
-                        package.AddAndResetValueObjects(results);
+                        var w = GetNextWorkerCell(workers, package);
+                        if (w != null)
+                        {
+                            workers.Remove(w);
+                            var results = w.Process(package.GetValueObjects<object>());
+                            package.AddAndResetValueObjects(results);
+                        }
+                        else
+                        {
+                            Logger.Debug(
+                                $"uncompleted chain for Package: Id[{package.Id}] on Current[{package.GetCurrentValueObjectType.Name}] for {package.GetResultType.Name}");
+                            break;
+                        }
                     }
-                    else
-                    {
-                        Logger.Debug(
-                            $"uncompleted chain for Package: Id[{package.Id}] on Current[{package.GetCurrentValueObjectType.Name}] for {package.GetResultType.Name}");
-                        break;
-                    }
+                }
+                catch (Exception ex)
+                {
+                    package.HandleError(ex);
                 }
             };
         }

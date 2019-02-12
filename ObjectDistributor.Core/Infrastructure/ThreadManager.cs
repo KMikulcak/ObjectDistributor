@@ -60,8 +60,8 @@ namespace ObjectDistributor.Core.Infrastructure
                 while (!CanRunNewThread(taskType))
                 {
                     _warningBlock++;
-                    Thread.Sleep(200);
-                    if (_warningBlock < 20) continue;
+                    Thread.Sleep(100);
+                    if (_warningBlock < 40) continue;
                     Logger.Warn($"MAX Threads reached, waiting for new Thread opening for {taskType}");
                     _warningBlock = 0;
                 }

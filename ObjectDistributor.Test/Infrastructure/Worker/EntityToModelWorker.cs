@@ -8,7 +8,7 @@ namespace ObjectDistributor.Test.Infrastructure.Worker
 {
     public class EntityToModelWorker : WorkerCell<TestEntity, TestModel>
     {
-        public EntityToModelWorker() : base(3, new[] {1})
+        public EntityToModelWorker() : base(3, new[] {1, 2})
         {
         }
 

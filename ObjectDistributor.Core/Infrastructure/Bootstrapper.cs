@@ -11,7 +11,7 @@ namespace ObjectDistributor.Core.Infrastructure
         {
             var config = new LoggingConfiguration();
 
-            var logfile = new FileTarget("logfile") { FileName = $"logfile_{DateTime.Now}.txt" };
+            var logfile = new FileTarget("logfile") {FileName = $"logfile_{DateTime.Now}.txt"};
             var logConsole = new ConsoleTarget {Layout = "${date:format=HH\\:MM\\:ss} ${logger} ${message}"};
 
             config.AddRule(LogLevel.Info, LogLevel.Fatal, logConsole);

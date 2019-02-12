@@ -17,9 +17,13 @@ namespace ObjectDistributor.Core.ObjectHandler
 
         Status Status { get; }
 
+        bool IsResolved { get; }
+
         void AddAndResetValueObjects<TValueObject>(IList<TValueObject> valueObjects);
 
         IList<TValueObject> GetValueObjects<TValueObject>();
+
+        void HandleError(Exception ex);
     }
 
     public enum Status
@@ -27,6 +31,8 @@ namespace ObjectDistributor.Core.ObjectHandler
         Created,
         Waiting,
         InProgress,
-        Resolved
+        Resolved,
+        WasNull,
+        Error
     }
 }
