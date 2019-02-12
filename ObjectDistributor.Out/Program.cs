@@ -8,7 +8,7 @@ namespace ObjectDistributor.Out
     {
         private static void Main(string[] args)
         {
-            var dis = new Distributor(20, 20, Distributor.MegaBytes.TwoGB);
+            var dis = new Distributor(20, 20, Distributor.MegaBytes.OneGB);
 
             dis.AddWorkerCell(new TimeWorker());
             dis.AddWorkerCell(new OutputWorker());

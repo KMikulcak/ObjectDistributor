@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices.ComTypes;
 using System.Threading;
 using System.Threading.Tasks;
 using NLog;
@@ -55,32 +56,35 @@ namespace ObjectDistributor.Core.Infrastructure
             _mainThread.Start();
         }
 
-        public static void LogicRun(BlockingCollection<Action> actions, TaskType taskType)
+        public static Task LogicRun(BlockingCollection<Action> actions, TaskType taskType)
         {
-            foreach (var result in actions.GetConsumingEnumerable())
+            return Task.Run(() =>
             {
-                HandleThreadNumbers(taskType, OperationType.Increase);
-                while (!CanRunNewThread(taskType))
+                foreach (var result in actions.GetConsumingEnumerable())
                 {
-                    _warningBlock++;
-                    Thread.Sleep(100);
-                    if (_warningBlock < 40) continue;
-                    Logger.Warn($"MAX Threads reached, waiting for new Thread opening for {taskType}");
-                    _warningBlock = 0;
-                }
+                    HandleThreadNumbers(taskType, OperationType.Increase);
+                    while (!CanRunNewThread(taskType))
+                    {
+                        _warningBlock++;
+                        Thread.Sleep(100);
+                        if (_warningBlock > 40) continue;
+                        Logger.Warn($"MAX Threads reached, waiting for new Thread opening for {taskType}");
+                        _warningBlock = 0;
+                    }
 
-                Task.Factory.StartNew(() =>
-                {
-                    result.Invoke();
-                    HandleThreadNumbers(taskType, OperationType.Decrease);
-                    Logger.Debug($"pulled {taskType} out of queue");
-                }, _token);
-            }
+                    Task.Factory.StartNew(() =>
+                    {
+                        result.Invoke();
+                        HandleThreadNumbers(taskType, OperationType.Decrease);
+                        Logger.Debug($"pulled {taskType} out of queue");
+                    }, _token);
+                }
+            }, _token);
         }
 
-        public void AddProcess(Action action)
+        public Task AddProcess(Action action)
         {
-            _requests.TryAdd(action);
+            return Task.Run(() => { _requests.TryAdd(action); }, _token);
         }
 
         public static void ProcessRequests()
@@ -99,10 +103,10 @@ namespace ObjectDistributor.Core.Infrastructure
                     while (!(GC.GetTotalMemory(false) - initialMemory < _maxMemory))
                     {
                         _warningMem++;
-                        if (_warningMem < 20) continue;
+                        Thread.Sleep(500);
+                        if (_warningMem > 200000) continue;
                         Logger.Warn($"MAX memory reached[{_maxMemory}], waiting for decreasing");
                         _warningMem = 0;
-                        Task.Delay(100);
                     }
 
                     result.Invoke();

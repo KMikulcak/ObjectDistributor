@@ -61,10 +61,10 @@ namespace ObjectDistributor.Core
             _threadManager.AddProcess(() => { _packageService.AddWorker(workerCell); });
         }
 
-        public void AddData<TValueObject, TResult>(List<TValueObject> valueObjects, IConsumer<TResult> consumer,
+        public async void AddData<TValueObject, TResult>(List<TValueObject> valueObjects, IConsumer<TResult> consumer,
             int workId)
         {
-            _threadManager.AddProcess(() =>
+            await _threadManager.AddProcess(() =>
             {
                 _addDataTasks.TryAdd(AddDataTask<TValueObject, TResult>(valueObjects, consumer, workId));
             });
