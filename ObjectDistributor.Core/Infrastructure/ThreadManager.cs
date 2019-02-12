@@ -89,23 +89,24 @@ namespace ObjectDistributor.Core.Infrastructure
             Task.Factory.StartNew(() =>
             {
                 var processes = _requests;
-                while (!_token.IsCancellationRequested)
-                    if (GC.GetTotalMemory(false) - initialMemory < _maxMemory)
-                    {
-                        if (processes.Any())
-                            foreach (var result in processes.GetConsumingEnumerable())
-                                result.Invoke();
-                        else
-                            Thread.Sleep(100);
-                    }
-                    else
+
+                foreach (var result in processes.GetConsumingEnumerable())
+                {
+                    Logger.Debug(
+                        $"current memory usage {(GC.GetTotalMemory(false) - initialMemory) / 1000}mb, Limit[{_maxMemory / 1000}mb]");
+                    Logger.Debug($"currently {_requests.Count} processes in queue");
+
+                    while (!(GC.GetTotalMemory(false) - initialMemory < _maxMemory))
                     {
                         _warningMem++;
                         if (_warningMem < 20) continue;
                         Logger.Warn($"MAX memory reached[{_maxMemory}], waiting for decreasing");
                         _warningMem = 0;
-                        Thread.Sleep(100);
+                        Task.Delay(100);
                     }
+
+                    result.Invoke();
+                }
             }, _token);
         }
 
