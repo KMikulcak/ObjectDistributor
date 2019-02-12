@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using NLog;
@@ -27,29 +28,31 @@ namespace ObjectDistributor.Core.Infrastructure
         private static bool _canRunPackage;
 
         private static CancellationToken _token;
+        private static BlockingCollection<Action> _requests;
 
         private static IList<Task> _manageTasks;
 
         private static int _warningBlock;
+        private static int _warningMem;
+        private static long _maxMemory;
 
-        public ThreadManager(int maxAddThreads, int maxPackageThreads, CancellationToken token, IList<Task> manageTasks)
+        public ThreadManager(int maxAddThreads, int maxPackageThreads, CancellationToken token, IList<Task> manageTasks,
+            int maxMemoryInMegaBytes)
         {
             _maxAddThreads = maxAddThreads;
             _maxPackageThreads = maxPackageThreads;
             _token = token;
+            _maxMemory = CalculateMemoryByMegaBytes(maxMemoryInMegaBytes);
 
             _mainThread = new Thread(Run);
             _manageTasks = manageTasks;
+
+            _requests = new BlockingCollection<Action>(new ConcurrentQueue<Action>());
         }
 
         public void Start()
         {
             _mainThread.Start();
-        }
-
-        private static void Run()
-        {
-            foreach (var task in _manageTasks) task.Start();
         }
 
         public static void LogicRun(BlockingCollection<Action> actions, TaskType taskType)
@@ -73,6 +76,48 @@ namespace ObjectDistributor.Core.Infrastructure
                     Logger.Debug($"pulled {taskType} out of queue");
                 }, _token);
             }
+        }
+
+        public void AddProcess(Action action)
+        {
+            _requests.TryAdd(action);
+        }
+
+        public static void ProcessRequests()
+        {
+            var initialMemory = GC.GetTotalMemory(false);
+            Task.Factory.StartNew(() =>
+            {
+                var processes = _requests;
+                while (!_token.IsCancellationRequested)
+                    if (GC.GetTotalMemory(false) - initialMemory < _maxMemory)
+                    {
+                        if (processes.Any())
+                            foreach (var result in processes.GetConsumingEnumerable())
+                                result.Invoke();
+                        else
+                            Thread.Sleep(100);
+                    }
+                    else
+                    {
+                        _warningMem++;
+                        if (_warningMem < 20) continue;
+                        Logger.Warn($"MAX memory reached[{_maxMemory}], waiting for decreasing");
+                        _warningMem = 0;
+                        Thread.Sleep(100);
+                    }
+            }, _token);
+        }
+
+        private static long CalculateMemoryByMegaBytes(int megaBytes)
+        {
+            return 1024 * 1024 * megaBytes;
+        }
+
+        private static void Run()
+        {
+            foreach (var task in _manageTasks) task.Start();
+            ProcessRequests();
         }
 
         private static void HandleThreadNumbers(TaskType taskType, OperationType operationType)

@@ -14,13 +14,25 @@ namespace ObjectDistributor.Core
 {
     public class Distributor
     {
+        public enum MegaBytes
+        {
+            OneGB = 1000,
+            TwoGB = 2000,
+            ThreeGB = 3000,
+            FourGB = 4000,
+            FiveGB = 5000,
+            SixGB = 6000,
+            SevenGB = 7000,
+            EightGB = 8000
+        }
+
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
         private readonly BlockingCollection<Action> _addDataTasks;
         private readonly PackageService _packageService;
         private readonly BlockingCollection<Action> _packageTasks;
         private readonly ThreadManager _threadManager;
 
-        public Distributor(int maxAddThreads = 10, int maxPackageThreads = 10)
+        public Distributor(int maxAddThreads = 10, int maxPackageThreads = 10, MegaBytes maxMemory = MegaBytes.OneGB)
         {
             Bootstrapper.Init();
 
@@ -37,7 +49,7 @@ namespace ObjectDistributor.Core
                 {
                     ManageTaskAction(TaskType.AddData),
                     ManageTaskAction(TaskType.Package)
-                });
+                }, (int) maxMemory);
 
             Logger.Debug("Created");
         }
@@ -46,13 +58,16 @@ namespace ObjectDistributor.Core
 
         public void AddWorkerCell<TValueObject, TResult>(WorkerCell<TValueObject, TResult> workerCell)
         {
-            _packageService.AddWorker(workerCell);
+            _threadManager.AddProcess(() => { _packageService.AddWorker(workerCell); });
         }
 
         public void AddData<TValueObject, TResult>(List<TValueObject> valueObjects, IConsumer<TResult> consumer,
             int workId)
         {
-            _addDataTasks.TryAdd(AddDataTask<TValueObject, TResult>(valueObjects, consumer, workId));
+            _threadManager.AddProcess(() =>
+            {
+                _addDataTasks.TryAdd(AddDataTask<TValueObject, TResult>(valueObjects, consumer, workId));
+            });
         }
 
         public void Start()
